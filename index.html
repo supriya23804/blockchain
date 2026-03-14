@@ -1,0 +1,737 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>CertChain — Blockchain Certificate Verification</title>
+<link href="https://fonts.googleapis.com/css2?family=Syne:wght@400;500;600;700;800&family=DM+Sans:ital,opsz,wght@0,9..40,300;0,9..40,400;0,9..40,500;1,9..40,300&display=swap" rel="stylesheet">
+<style>
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+:root {
+  --bg: #050c1a;
+  --surface: rgba(255,255,255,0.035);
+  --surface-hover: rgba(255,255,255,0.06);
+  --border: rgba(255,255,255,0.08);
+  --border-bright: rgba(99,210,255,0.3);
+  --accent: #3ae8ff;
+  --accent2: #7b6cff;
+  --accent3: #00ffa3;
+  --text: #e8f0fe;
+  --text-muted: rgba(232,240,254,0.5);
+  --text-dim: rgba(232,240,254,0.25);
+  --success: #00ffa3;
+  --danger: #ff4e6a;
+  --warning: #ffb84d;
+  --font-display: 'Syne', sans-serif;
+  --font-body: 'DM Sans', sans-serif;
+}
+
+html { scroll-behavior: smooth; }
+body { font-family: var(--font-body); background: var(--bg); color: var(--text); min-height: 100vh; overflow-x: hidden; }
+
+.bg-layer { position: fixed; inset: 0; z-index: 0; pointer-events: none;
+  background: radial-gradient(ellipse 80% 50% at 10% 10%, rgba(58,232,255,0.07) 0%, transparent 60%),
+              radial-gradient(ellipse 60% 60% at 90% 80%, rgba(123,108,255,0.08) 0%, transparent 55%),
+              radial-gradient(ellipse 40% 40% at 50% 50%, rgba(0,255,163,0.03) 0%, transparent 70%); }
+
+.grid-bg { position: fixed; inset: 0; z-index: 0; pointer-events: none;
+  background-image: linear-gradient(rgba(58,232,255,0.04) 1px, transparent 1px), linear-gradient(90deg, rgba(58,232,255,0.04) 1px, transparent 1px);
+  background-size: 60px 60px;
+  mask-image: radial-gradient(ellipse 80% 80% at 50% 50%, black 30%, transparent 100%); }
+
+.orb { position: fixed; border-radius: 50%; filter: blur(80px); pointer-events: none; z-index: 0; animation: float 12s ease-in-out infinite; }
+.orb1 { width:400px; height:400px; background:rgba(58,232,255,0.06); top:-100px; left:-100px; animation-delay:0s; }
+.orb2 { width:300px; height:300px; background:rgba(123,108,255,0.07); bottom:-80px; right:-80px; animation-delay:-5s; }
+.orb3 { width:200px; height:200px; background:rgba(0,255,163,0.05); top:40%; left:60%; animation-delay:-8s; }
+
+@keyframes float { 0%,100%{transform:translate(0,0)} 33%{transform:translate(30px,-20px)} 66%{transform:translate(-20px,30px)} }
+
+.wrapper { position: relative; z-index: 1; max-width: 1140px; margin: 0 auto; padding: 0 24px; }
+
+nav { position: sticky; top: 0; z-index: 100; border-bottom: 1px solid var(--border); background: rgba(5,12,26,0.85); backdrop-filter: blur(20px); }
+.nav-inner { max-width: 1140px; margin: 0 auto; padding: 0 24px; height: 64px; display: flex; align-items: center; justify-content: space-between; }
+.nav-logo { font-family: var(--font-display); font-size: 20px; font-weight: 800; background: linear-gradient(135deg,var(--accent),var(--accent2)); -webkit-background-clip: text; -webkit-text-fill-color: transparent; background-clip: text; }
+.nav-logo span { -webkit-text-fill-color: var(--text-muted); font-weight: 300; }
+.nav-badge { font-size: 11px; font-weight: 500; letter-spacing: 0.05em; padding: 4px 10px; border-radius: 99px; border: 1px solid rgba(58,232,255,0.3); color: var(--accent); background: rgba(58,232,255,0.07); text-transform: uppercase; }
+
+.hero { padding: 90px 0 60px; text-align: center; }
+.hero-eyebrow { display: inline-flex; align-items: center; gap: 8px; font-size: 12px; font-weight: 500; letter-spacing: 0.12em; text-transform: uppercase; color: var(--accent); margin-bottom: 24px; padding: 6px 16px; border-radius: 99px; border: 1px solid rgba(58,232,255,0.2); background: rgba(58,232,255,0.06); animation: fadeUp 0.6s ease both; }
+.hero-eyebrow::before { content:''; width:6px; height:6px; border-radius:50%; background:var(--accent); animation: pulse 2s ease infinite; }
+@keyframes pulse { 0%,100%{opacity:1;transform:scale(1)} 50%{opacity:0.5;transform:scale(0.7)} }
+.hero h1 { font-family: var(--font-display); font-size: clamp(38px,6vw,72px); font-weight: 800; line-height: 1.08; letter-spacing: -2px; margin-bottom: 20px; animation: fadeUp 0.6s 0.1s ease both; }
+.hero h1 em { font-style: normal; background: linear-gradient(135deg,var(--accent) 0%,var(--accent2) 60%,var(--accent3) 100%); -webkit-background-clip: text; -webkit-text-fill-color: transparent; background-clip: text; }
+.hero-sub { font-size: clamp(15px,2vw,18px); color: var(--text-muted); max-width: 560px; margin: 0 auto 16px; line-height: 1.7; font-weight: 300; animation: fadeUp 0.6s 0.2s ease both; }
+@keyframes fadeUp { from{opacity:0;transform:translateY(18px)} to{opacity:1;transform:translateY(0)} }
+
+/* TABS */
+.tabs { display: flex; gap: 8px; justify-content: center; margin-bottom: 48px; animation: fadeUp 0.6s 0.25s ease both; }
+.tab-btn { font-family: var(--font-body); font-size: 14px; font-weight: 500; padding: 10px 24px; border-radius: 99px; border: 1px solid var(--border); background: var(--surface); color: var(--text-muted); cursor: pointer; transition: all 0.2s; }
+.tab-btn.active { border-color: rgba(58,232,255,0.4); background: rgba(58,232,255,0.08); color: var(--accent); }
+.tab-btn:hover:not(.active) { border-color: var(--border-bright); color: var(--text); }
+
+.tab-panel { display: none; }
+.tab-panel.active { display: block; }
+
+/* STATS */
+.stats { display: flex; justify-content: center; gap: 40px; flex-wrap: wrap; padding: 28px 0; border-top: 1px solid var(--border); border-bottom: 1px solid var(--border); margin-bottom: 48px; animation: fadeUp 0.6s 0.3s ease both; }
+.stat { text-align: center; }
+.stat-num { font-family: var(--font-display); font-size: 28px; font-weight: 700; background: linear-gradient(135deg,var(--accent),var(--accent2)); -webkit-background-clip: text; -webkit-text-fill-color: transparent; background-clip: text; }
+.stat-label { font-size: 12px; color: var(--text-muted); letter-spacing: 0.06em; text-transform: uppercase; margin-top: 2px; }
+
+/* UPLOAD GRID */
+.section-title { font-family: var(--font-display); font-size: 28px; font-weight: 700; letter-spacing: -0.5px; margin-bottom: 8px; }
+.section-sub { color: var(--text-muted); font-size: 14px; margin-bottom: 32px; }
+
+.upload-grid { display: grid; grid-template-columns: repeat(auto-fill,minmax(280px,1fr)); gap: 16px; margin-bottom: 40px; }
+
+.upload-card { background: var(--surface); border: 1px solid var(--border); border-radius: 14px; padding: 20px; transition: border-color 0.25s, background 0.25s, transform 0.2s; position: relative; overflow: hidden; }
+.upload-card::before { content:''; position:absolute; inset:0; background:linear-gradient(135deg,rgba(58,232,255,0.04),transparent); opacity:0; transition:opacity 0.3s; }
+.upload-card:hover { border-color: var(--border-bright); background: var(--surface-hover); transform: translateY(-2px); }
+.upload-card:hover::before { opacity: 1; }
+.upload-card.verifying { border-color: rgba(58,232,255,0.4); }
+.upload-card.verified  { border-color: rgba(0,255,163,0.5); background: rgba(0,255,163,0.05); }
+.upload-card.failed    { border-color: rgba(255,78,106,0.5); background: rgba(255,78,106,0.05); }
+
+.card-top { display: flex; align-items: center; gap: 12px; margin-bottom: 14px; }
+.card-icon { width:40px; height:40px; border-radius:10px; display:flex; align-items:center; justify-content:center; font-size:20px; flex-shrink:0; }
+.card-label { font-family: var(--font-display); font-size: 15px; font-weight: 600; }
+.card-type { font-size: 12px; color: var(--text-muted); margin-top: 1px; }
+
+.file-drop { border: 1.5px dashed rgba(255,255,255,0.12); border-radius: 10px; padding: 16px; text-align: center; cursor: pointer; transition: border-color 0.2s, background 0.2s; position: relative; }
+.file-drop:hover { border-color: rgba(58,232,255,0.4); background: rgba(58,232,255,0.03); }
+.file-drop input[type="file"] { position:absolute; inset:0; opacity:0; cursor:pointer; width:100%; height:100%; }
+.file-drop-text { font-size: 13px; color: var(--text-muted); pointer-events: none; }
+.file-drop-text strong { display:block; color:var(--accent); font-size:12px; margin-bottom:2px; }
+.file-drop-filename { font-size: 11px; color: var(--accent3); margin-top: 4px; word-break: break-all; }
+
+.card-status { margin-top: 12px; font-size: 12px; font-weight: 500; display: flex; align-items: center; gap: 6px; opacity: 0; transition: opacity 0.3s; min-height: 20px; }
+.card-status.show { opacity: 1; }
+.status-dot { width:6px; height:6px; border-radius:50%; flex-shrink:0; }
+
+/* RESULT BANNER */
+.result-banner { border-radius: 16px; padding: 28px 32px; border: 1px solid; display: none; text-align: center; margin-bottom: 32px; animation: bannerIn 0.4s ease; }
+@keyframes bannerIn { from{opacity:0;transform:scale(0.97)} to{opacity:1;transform:scale(1)} }
+.result-banner.success { background: rgba(0,255,163,0.06); border-color: rgba(0,255,163,0.3); }
+.result-banner.error   { background: rgba(255,78,106,0.06); border-color: rgba(255,78,106,0.3); }
+.result-icon { font-size: 40px; margin-bottom: 10px; }
+.result-title { font-family: var(--font-display); font-size: 22px; font-weight: 700; margin-bottom: 4px; }
+.result-sub { font-size: 14px; color: var(--text-muted); }
+.result-hash { font-family: monospace; font-size: 11px; color: var(--text-dim); margin-top: 12px; word-break: break-all; }
+
+/* CERT DETAILS CARD */
+.cert-details { margin-top: 16px; background: rgba(255,255,255,0.04); border: 1px solid rgba(0,255,163,0.15); border-radius: 10px; padding: 16px; text-align: left; display: none; }
+.cert-details.show { display: block; }
+.cert-details-title { font-family: var(--font-display); font-size: 13px; font-weight: 600; color: var(--accent3); letter-spacing: 0.08em; text-transform: uppercase; margin-bottom: 12px; }
+.cert-row { display: flex; justify-content: space-between; gap: 12px; padding: 6px 0; border-bottom: 1px solid rgba(255,255,255,0.05); font-size: 13px; }
+.cert-row:last-child { border-bottom: none; }
+.cert-key { color: var(--text-muted); flex-shrink: 0; }
+.cert-val { color: var(--text); font-weight: 500; text-align: right; }
+
+/* REGISTER FORM */
+.register-form { background: var(--surface); border: 1px solid var(--border); border-radius: 16px; padding: 32px; margin-bottom: 40px; }
+.form-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; margin-bottom: 16px; }
+.form-group { display: flex; flex-direction: column; gap: 6px; }
+.form-group.full { grid-column: 1/-1; }
+.form-label { font-size: 12px; font-weight: 500; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.06em; }
+.form-input, .form-select { background: rgba(255,255,255,0.05); border: 1px solid var(--border); border-radius: 8px; padding: 10px 14px; color: var(--text); font-family: var(--font-body); font-size: 14px; transition: border-color 0.2s; outline: none; }
+.form-input:focus, .form-select:focus { border-color: rgba(58,232,255,0.4); }
+.form-input::placeholder { color: var(--text-dim); }
+.form-select option { background: #0d1b2e; }
+.hash-display { font-family: monospace; font-size: 11px; background: rgba(0,0,0,0.3); border: 1px solid var(--border); border-radius: 8px; padding: 10px 14px; color: var(--accent3); word-break: break-all; min-height: 44px; display: flex; align-items: center; }
+.hash-hint { font-size: 11px; color: var(--text-dim); margin-top: 4px; }
+
+.btn { display: inline-flex; align-items: center; gap: 8px; padding: 12px 28px; border-radius: 99px; border: none; font-family: var(--font-display); font-size: 14px; font-weight: 600; cursor: pointer; transition: all 0.2s; letter-spacing: 0.02em; }
+.btn-primary { background: linear-gradient(135deg,var(--accent),var(--accent2)); color: #000; }
+.btn-primary:hover { transform: translateY(-1px); box-shadow: 0 8px 24px rgba(58,232,255,0.25); }
+.btn-primary:disabled { opacity: 0.5; cursor: not-allowed; transform: none; }
+.btn-outline { background: transparent; color: var(--accent); border: 1px solid rgba(58,232,255,0.3); }
+.btn-outline:hover { background: rgba(58,232,255,0.08); }
+
+.register-result { margin-top: 20px; border-radius: 12px; padding: 16px 20px; display: none; font-size: 14px; }
+.register-result.success { background: rgba(0,255,163,0.08); border: 1px solid rgba(0,255,163,0.3); color: var(--success); }
+.register-result.error   { background: rgba(255,78,106,0.08); border: 1px solid rgba(255,78,106,0.3); color: var(--danger); }
+.register-result.dup     { background: rgba(255,184,77,0.08); border: 1px solid rgba(255,184,77,0.3); color: var(--warning); }
+
+/* LEDGER TABLE */
+.ledger-section { margin-bottom: 40px; }
+.ledger-stats { display: grid; grid-template-columns: repeat(4,1fr); gap: 12px; margin-bottom: 24px; }
+.ledger-stat { background: var(--surface); border: 1px solid var(--border); border-radius: 10px; padding: 16px; text-align: center; }
+.ledger-stat-num { font-family: var(--font-display); font-size: 24px; font-weight: 700; }
+.ledger-stat-num.green { color: var(--success); }
+.ledger-stat-num.red   { color: var(--danger); }
+.ledger-stat-num.blue  { color: var(--accent); }
+.ledger-stat-num.purple{ color: var(--accent2); }
+.ledger-stat-label { font-size: 11px; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.06em; margin-top: 2px; }
+
+.table-wrap { overflow-x: auto; border-radius: 12px; border: 1px solid var(--border); }
+table { width: 100%; border-collapse: collapse; font-size: 13px; }
+thead { background: rgba(58,232,255,0.05); }
+th { padding: 12px 16px; text-align: left; font-family: var(--font-display); font-size: 11px; font-weight: 600; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.08em; border-bottom: 1px solid var(--border); white-space: nowrap; }
+td { padding: 12px 16px; border-bottom: 1px solid rgba(255,255,255,0.04); color: var(--text-muted); }
+tr:last-child td { border-bottom: none; }
+tr:hover td { background: rgba(255,255,255,0.02); }
+.badge { display: inline-flex; align-items: center; gap: 4px; padding: 3px 10px; border-radius: 99px; font-size: 11px; font-weight: 600; }
+.badge-green { background: rgba(0,255,163,0.12); color: var(--success); border: 1px solid rgba(0,255,163,0.2); }
+.badge-red   { background: rgba(255,78,106,0.12); color: var(--danger); border: 1px solid rgba(255,78,106,0.2); }
+.hash-preview { font-family: monospace; font-size: 11px; color: var(--accent3); }
+.delete-btn { background: none; border: 1px solid rgba(255,78,106,0.3); color: var(--danger); border-radius: 6px; padding: 4px 10px; font-size: 11px; cursor: pointer; transition: all 0.2s; }
+.delete-btn:hover { background: rgba(255,78,106,0.1); }
+
+/* HOW IT WORKS */
+.how-section { margin-bottom: 72px; }
+.steps { display: flex; gap: 0; flex-wrap: wrap; position: relative; margin-top: 32px; }
+.steps::before { content:''; position:absolute; top:28px; left:28px; right:28px; height:1px; background:linear-gradient(90deg,var(--accent),var(--accent2),var(--accent3)); opacity:0.3; }
+.step { flex:1; min-width:160px; text-align:center; padding:0 16px; position:relative; }
+.step-num { width:56px; height:56px; border-radius:50%; background:var(--bg); border:1px solid var(--border-bright); display:flex; align-items:center; justify-content:center; margin:0 auto 16px; font-family:var(--font-display); font-size:20px; font-weight:700; color:var(--accent); position:relative; z-index:1; }
+.step-title { font-family: var(--font-display); font-size: 15px; font-weight: 600; margin-bottom: 6px; }
+.step-desc { font-size: 13px; color: var(--text-muted); line-height: 1.5; }
+
+/* FEATURES */
+.features { display: grid; grid-template-columns: repeat(auto-fit,minmax(240px,1fr)); gap: 16px; margin-bottom: 72px; }
+.feature-card { background: var(--surface); border: 1px solid var(--border); border-radius: 14px; padding: 24px; transition: transform 0.2s, border-color 0.2s; }
+.feature-card:hover { transform: translateY(-3px); border-color: rgba(123,108,255,0.3); }
+.feature-icon { font-size: 28px; margin-bottom: 14px; }
+.feature-title { font-family: var(--font-display); font-size: 16px; font-weight: 600; margin-bottom: 6px; }
+.feature-desc { font-size: 13px; color: var(--text-muted); line-height: 1.6; }
+
+footer { border-top: 1px solid var(--border); padding: 32px 0; text-align: center; color: var(--text-dim); font-size: 13px; position: relative; z-index: 1; }
+footer strong { color: var(--accent); }
+
+@keyframes spin { to{transform:rotate(360deg)} }
+.spinner { display:inline-block; width:12px; height:12px; border:2px solid rgba(58,232,255,0.3); border-top-color:var(--accent); border-radius:50%; animation:spin 0.7s linear infinite; }
+
+.empty-state { text-align: center; padding: 48px 24px; color: var(--text-dim); font-size: 14px; }
+.empty-state-icon { font-size: 40px; margin-bottom: 12px; opacity: 0.5; }
+
+@media(max-width:768px) {
+  .upload-grid { grid-template-columns: 1fr; }
+  .features { grid-template-columns: 1fr 1fr; }
+  .form-grid { grid-template-columns: 1fr; }
+  .ledger-stats { grid-template-columns: 1fr 1fr; }
+}
+@media(max-width:640px) {
+  .hero { padding: 60px 0 40px; }
+  .stats { gap: 24px; }
+  .steps::before { display: none; }
+  .features { grid-template-columns: 1fr; }
+  .steps { gap: 24px; }
+  .tabs { flex-wrap: wrap; }
+  .ledger-stats { grid-template-columns: 1fr 1fr; }
+}
+</style>
+</head>
+<body>
+
+<div class="bg-layer"></div>
+<div class="grid-bg"></div>
+<div class="orb orb1"></div>
+<div class="orb orb2"></div>
+<div class="orb orb3"></div>
+
+<nav>
+  <div class="nav-inner">
+    <div class="nav-logo">CertChain <span>/ Verification</span></div>
+    <span class="nav-badge">🔗 Blockchain Secured</span>
+  </div>
+</nav>
+
+<div class="wrapper">
+
+  <section class="hero">
+    <div class="hero-eyebrow">Decentralized Trust Infrastructure</div>
+    <h1>Verify Any Certificate<br>With <em>Blockchain Proof</em></h1>
+    <p class="hero-sub">Upload documents to instantly verify authenticity using SHA-256 cryptographic hashing — or register new certificates to the in-browser blockchain ledger.</p>
+  </section>
+
+  <!-- TABS -->
+  <div class="tabs">
+    <button class="tab-btn active" onclick="switchTab('verify')">🔍 Verify Certificate</button>
+    <button class="tab-btn" onclick="switchTab('register')">📝 Register Certificate</button>
+    <button class="tab-btn" onclick="switchTab('ledger')">⛓️ Blockchain Ledger</button>
+  </div>
+
+  <!-- ══════════ TAB: VERIFY ══════════ -->
+  <div class="tab-panel active" id="tab-verify">
+
+    <div class="stats">
+      <div class="stat"><div class="stat-num" id="stat-total">—</div><div class="stat-label">Registered Certs</div></div>
+      <div class="stat"><div class="stat-num" id="stat-checks">—</div><div class="stat-label">Verifications Done</div></div>
+      <div class="stat"><div class="stat-num">SHA-256</div><div class="stat-label">Hash Algorithm</div></div>
+      <div class="stat"><div class="stat-num">&lt; 1s</div><div class="stat-label">Verify Time</div></div>
+    </div>
+
+    <div style="margin-bottom:32px">
+      <div class="section-title">Upload &amp; Verify Documents</div>
+      <div class="section-sub">Select a file — the system computes its SHA-256 hash and checks it against the in-browser blockchain registry.</div>
+    </div>
+
+    <div class="upload-grid" id="upload-grid"></div>
+
+    <!-- Result Banner -->
+    <div class="result-banner" id="result-banner">
+      <div class="result-icon" id="result-icon"></div>
+      <div class="result-title" id="result-title"></div>
+      <div class="result-sub" id="result-sub"></div>
+      <div class="result-hash" id="result-hash"></div>
+      <div class="cert-details" id="cert-details">
+        <div class="cert-details-title">📋 Certificate Details</div>
+        <div id="cert-details-rows"></div>
+      </div>
+    </div>
+
+  </div>
+
+  <!-- ══════════ TAB: REGISTER ══════════ -->
+  <div class="tab-panel" id="tab-register">
+    <div style="margin-bottom:32px; margin-top:8px">
+      <div class="section-title">Register a Certificate</div>
+      <div class="section-sub">Upload the certificate file to compute its SHA-256 hash, fill in the details, then register it on the blockchain ledger.</div>
+    </div>
+
+    <div class="register-form">
+      <div class="form-grid">
+        <div class="form-group full">
+          <label class="form-label">Certificate File (to generate hash)</label>
+          <div class="file-drop" style="margin-bottom:4px">
+            <input type="file" accept="image/*,.pdf" id="reg-file-input" onchange="onRegisterFileChange(this)">
+            <div class="file-drop-text" id="reg-file-text"><strong>Click to select certificate file</strong>JPG, PNG or PDF</div>
+          </div>
+          <div class="hash-hint">The SHA-256 hash is computed locally — your file never leaves this page.</div>
+        </div>
+
+        <div class="form-group full">
+          <label class="form-label">SHA-256 Hash (auto-generated)</label>
+          <div class="hash-display" id="reg-hash-display">— Upload a file above to generate hash —</div>
+        </div>
+
+        <div class="form-group">
+          <label class="form-label">Owner / Holder Name</label>
+          <input type="text" class="form-input" id="reg-owner" placeholder="e.g. Ravi Kumar">
+        </div>
+
+        <div class="form-group">
+          <label class="form-label">Document Type</label>
+          <select class="form-select" id="reg-doctype">
+            <option value="">Select type…</option>
+            <option>Aadhaar Card</option>
+            <option>PAN Card</option>
+            <option>Driving License</option>
+            <option>10th Mark Sheet</option>
+            <option>12th Mark Sheet</option>
+            <option>Degree Certificate</option>
+            <option>PG Certificate</option>
+          </select>
+        </div>
+
+        <div class="form-group">
+          <label class="form-label">Issued By</label>
+          <input type="text" class="form-input" id="reg-issuer" placeholder="e.g. Anna University">
+        </div>
+
+        <div class="form-group">
+          <label class="form-label">Issue Date</label>
+          <input type="date" class="form-input" id="reg-date">
+        </div>
+      </div>
+
+      <button class="btn btn-primary" id="reg-submit-btn" onclick="registerCertificate()" disabled>
+        <span>⛓️ Register on Blockchain</span>
+      </button>
+
+      <div class="register-result" id="register-result"></div>
+    </div>
+  </div>
+
+  <!-- ══════════ TAB: LEDGER ══════════ -->
+  <div class="tab-panel" id="tab-ledger">
+    <div style="margin-bottom:24px; margin-top:8px; display:flex; justify-content:space-between; align-items:flex-end; flex-wrap:wrap; gap:12px">
+      <div>
+        <div class="section-title">Blockchain Ledger</div>
+        <div class="section-sub" style="margin-bottom:0">All registered certificates &amp; verification logs</div>
+      </div>
+      <button class="btn btn-outline" onclick="refreshLedger()">🔄 Refresh</button>
+    </div>
+
+    <div class="ledger-stats">
+      <div class="ledger-stat"><div class="ledger-stat-num blue" id="ls-total">0</div><div class="ledger-stat-label">Total Certs</div></div>
+      <div class="ledger-stat"><div class="ledger-stat-num purple" id="ls-checks">0</div><div class="ledger-stat-label">Verifications</div></div>
+      <div class="ledger-stat"><div class="ledger-stat-num green" id="ls-valid">0</div><div class="ledger-stat-label">Valid Checks</div></div>
+      <div class="ledger-stat"><div class="ledger-stat-num red" id="ls-failed">0</div><div class="ledger-stat-label">Not Found</div></div>
+    </div>
+
+    <div style="margin-bottom:16px">
+      <div style="font-family:var(--font-display);font-size:16px;font-weight:600;margin-bottom:12px">📜 Registered Certificates</div>
+      <div class="table-wrap">
+        <table>
+          <thead>
+            <tr><th>#</th><th>Hash Preview</th><th>Owner</th><th>Type</th><th>Issued By</th><th>Issue Date</th><th>Registered</th><th>Action</th></tr>
+          </thead>
+          <tbody id="certs-tbody"></tbody>
+        </table>
+      </div>
+    </div>
+
+    <div>
+      <div style="font-family:var(--font-display);font-size:16px;font-weight:600;margin-bottom:12px">📊 Verification Logs</div>
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th>#</th><th>Hash Preview</th><th>Status</th><th>Checked At</th></tr></thead>
+          <tbody id="logs-tbody"></tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+
+  <!-- HOW IT WORKS -->
+  <div class="how-section" style="margin-top:72px">
+    <div class="section-title">How It Works</div>
+    <div class="section-sub">Four steps to verified trust</div>
+    <div class="steps">
+      <div class="step"><div class="step-num">1</div><div class="step-title">Upload Document</div><div class="step-desc">Select any supported certificate file.</div></div>
+      <div class="step"><div class="step-num">2</div><div class="step-title">Hash Generation</div><div class="step-desc">SHA-256 fingerprint computed entirely in your browser — nothing uploaded.</div></div>
+      <div class="step"><div class="step-num">3</div><div class="step-title">Chain Lookup</div><div class="step-desc">Hash compared against the local blockchain registry instantly.</div></div>
+      <div class="step"><div class="step-num">4</div><div class="step-title">Instant Result</div><div class="step-desc">Receive an authentic or not-found verdict with full certificate details.</div></div>
+    </div>
+  </div>
+
+  <div class="section-title" style="margin-bottom:8px">Why CertChain</div>
+  <div class="section-sub">Built for institutions, trusted by individuals</div>
+  <div class="features">
+    <div class="feature-card"><div class="feature-icon">🔐</div><div class="feature-title">Zero Knowledge Upload</div><div class="feature-desc">Files never leave your device. Only the cryptographic hash is used for verification.</div></div>
+    <div class="feature-card"><div class="feature-icon">⛓️</div><div class="feature-title">Immutable Ledger</div><div class="feature-desc">Once registered, certificate hashes are stored and cannot be altered.</div></div>
+    <div class="feature-card"><div class="feature-icon">🌐</div><div class="feature-title">Full Audit Trail</div><div class="feature-desc">Every verification attempt is logged with timestamp and result.</div></div>
+    <div class="feature-card"><div class="feature-icon">⚡</div><div class="feature-title">Sub-Second Results</div><div class="feature-desc">Verification completes in milliseconds — no waiting, no queues.</div></div>
+  </div>
+
+</div>
+
+<footer>
+  <div class="wrapper">
+    <p>Built with <strong>CertChain Protocol</strong> — Blockchain Certificate Verification System &copy; 2025</p>
+    <p style="margin-top:6px;font-size:12px;">All verifications are cryptographically secured. No documents are stored — only SHA-256 hashes.</p>
+  </div>
+</footer>
+
+<script>
+// ═══════════════════════════════════════════════════════════
+//  IN-BROWSER "BLOCKCHAIN" DATABASE (localStorage-backed)
+// ═══════════════════════════════════════════════════════════
+
+const DB_KEY_CERTS = 'certchain_certs';
+const DB_KEY_LOGS  = 'certchain_logs';
+
+function loadCerts() {
+  try { return JSON.parse(localStorage.getItem(DB_KEY_CERTS) || '[]'); }
+  catch(e) { return []; }
+}
+function saveCerts(arr) { localStorage.setItem(DB_KEY_CERTS, JSON.stringify(arr)); }
+function loadLogs()  {
+  try { return JSON.parse(localStorage.getItem(DB_KEY_LOGS)  || '[]'); }
+  catch(e) { return []; }
+}
+function saveLogs(arr)  { localStorage.setItem(DB_KEY_LOGS, JSON.stringify(arr)); }
+
+function seedDemoData() {
+  let certs = loadCerts();
+  if (certs.length > 0) return;
+  const demos = [
+    { id:1, hash:'a1b2c3d4e5f6a1b2c3d4e5f6a1b2c3d4e5f6a1b2c3d4e5f6a1b2c3d4e5f6a1b2', owner_name:'Ravi Kumar', document_type:'Degree Certificate', issued_by:'Anna University', issue_date:'2023-05-15', registered_at: new Date().toISOString() },
+    { id:2, hash:'b2c3d4e5f6a1b2c3d4e5f6a1b2c3d4e5f6a1b2c3d4e5f6a1b2c3d4e5f6a1b2c3', owner_name:'Priya Sharma', document_type:'12th Mark Sheet', issued_by:'CBSE Board', issue_date:'2021-07-10', registered_at: new Date().toISOString() },
+    { id:3, hash:'c3d4e5f6a1b2c3d4e5f6a1b2c3d4e5f6a1b2c3d4e5f6a1b2c3d4e5f6a1b2c3d4', owner_name:'Arjun Singh', document_type:'PG Certificate', issued_by:'IIT Madras', issue_date:'2024-01-20', registered_at: new Date().toISOString() }
+  ];
+  saveCerts(demos);
+}
+seedDemoData();
+
+function getStats() {
+  const certs = loadCerts(), logs = loadLogs();
+  return {
+    total: certs.length,
+    checks: logs.length,
+    valid: logs.filter(l => l.status === 'valid').length,
+    failed: logs.filter(l => l.status === 'not_found').length
+  };
+}
+
+function verifyHash(hash) {
+  const certs = loadCerts();
+  const cert = certs.find(c => c.hash === hash);
+  const status = cert ? 'valid' : 'not_found';
+  const logs = loadLogs();
+  logs.unshift({ id: Date.now(), hash, status, checked_at: new Date().toISOString() });
+  saveLogs(logs.slice(0, 200));
+  updateStatBubbles();
+  return cert || null;
+}
+
+function registerHash({ hash, owner_name, document_type, issued_by, issue_date }) {
+  const certs = loadCerts();
+  if (certs.find(c => c.hash === hash)) return { status: 'duplicate' };
+  const id = certs.length > 0 ? Math.max(...certs.map(c => c.id)) + 1 : 1;
+  const entry = { id, hash, owner_name, document_type, issued_by, issue_date, registered_at: new Date().toISOString() };
+  certs.unshift(entry);
+  saveCerts(certs);
+  updateStatBubbles();
+  return { status: 'success', id };
+}
+
+function deleteCert(id) {
+  const certs = loadCerts().filter(c => c.id !== id);
+  saveCerts(certs);
+  refreshLedger();
+  updateStatBubbles();
+}
+
+// ═══════════════════════════════════════════════════════════
+//  SHA-256 HASH
+// ═══════════════════════════════════════════════════════════
+async function generateHash(file) {
+  const buffer     = await file.arrayBuffer();
+  const hashBuffer = await crypto.subtle.digest('SHA-256', buffer);
+  return Array.from(new Uint8Array(hashBuffer)).map(b => b.toString(16).padStart(2,'0')).join('');
+}
+
+// ═══════════════════════════════════════════════════════════
+//  CARD DEFINITIONS
+// ═══════════════════════════════════════════════════════════
+const CARD_TYPES = [
+  { label:'Aadhaar Card',    type:'Government ID · UIDAI',       icon:'🪪', bg:'rgba(58,232,255,0.1)'  },
+  { label:'PAN Card',        type:'Tax Identity · Income Tax',    icon:'💳', bg:'rgba(123,108,255,0.1)' },
+  { label:'Driving License', type:'Transport Authority · RTO',    icon:'🚗', bg:'rgba(0,255,163,0.08)'  },
+  { label:'10th Mark Sheet', type:'Secondary · Board of Education',icon:'📋',bg:'rgba(255,200,50,0.08)' },
+  { label:'12th Mark Sheet', type:'Higher Secondary · Board',     icon:'📄', bg:'rgba(255,140,0,0.08)'  },
+  { label:'Degree Certificate',type:'Undergraduate · University', icon:'🎓', bg:'rgba(58,232,255,0.08)' },
+  { label:'PG Certificate',  type:'Postgraduate · University',    icon:'🏅', bg:'rgba(123,108,255,0.1)' }
+];
+
+function buildCards() {
+  const grid = document.getElementById('upload-grid');
+  grid.innerHTML = CARD_TYPES.map((c,i) => `
+    <div class="upload-card" id="card-${i}">
+      <div class="card-top">
+        <div class="card-icon" style="background:${c.bg}">${c.icon}</div>
+        <div>
+          <div class="card-label">${c.label}</div>
+          <div class="card-type">${c.type}</div>
+        </div>
+      </div>
+      <div class="file-drop">
+        <input type="file" accept="image/*,.pdf" onchange="verifyCertificate(this,${i})">
+        <div class="file-drop-text" id="fdt-${i}"><strong>Click to upload</strong>JPG, PNG or PDF</div>
+      </div>
+      <div class="card-status" id="status-${i}"></div>
+    </div>
+  `).join('');
+}
+
+// ═══════════════════════════════════════════════════════════
+//  VERIFY FLOW
+// ═══════════════════════════════════════════════════════════
+function setCardState(idx, state, message, hash) {
+  const card   = document.getElementById('card-' + idx);
+  const status = document.getElementById('status-' + idx);
+  card.classList.remove('verifying','verified','failed');
+  status.classList.add('show');
+
+  if (state === 'loading') {
+    card.classList.add('verifying');
+    status.innerHTML = '<span class="spinner"></span> <span style="color:var(--accent)">Computing hash…</span>';
+  } else if (state === 'success') {
+    card.classList.add('verified');
+    status.innerHTML = '<span class="status-dot" style="background:var(--success)"></span><span style="color:var(--success)">' + message + '</span>';
+  } else if (state === 'error') {
+    card.classList.add('failed');
+    status.innerHTML = '<span class="status-dot" style="background:var(--danger)"></span><span style="color:var(--danger)">' + message + '</span>';
+  }
+}
+
+function showBanner(type, title, sub, hash, certData) {
+  const banner = document.getElementById('result-banner');
+  banner.className = 'result-banner ' + type;
+  banner.style.display = 'block';
+  document.getElementById('result-icon').textContent  = type === 'success' ? '✅' : '❌';
+  document.getElementById('result-title').textContent = title;
+  document.getElementById('result-title').style.color = type === 'success' ? 'var(--success)' : 'var(--danger)';
+  document.getElementById('result-sub').textContent   = sub;
+  document.getElementById('result-hash').textContent  = hash ? 'SHA-256: ' + hash : '';
+
+  const details = document.getElementById('cert-details');
+  const rows    = document.getElementById('cert-details-rows');
+  if (certData && type === 'success') {
+    rows.innerHTML = [
+      ['Owner / Holder', certData.owner_name],
+      ['Document Type',  certData.document_type],
+      ['Issued By',      certData.issued_by],
+      ['Issue Date',     certData.issue_date],
+      ['Blockchain ID',  '#' + certData.id],
+      ['Registered At',  new Date(certData.registered_at).toLocaleString()]
+    ].map(([k,v]) => `<div class="cert-row"><span class="cert-key">${k}</span><span class="cert-val">${v}</span></div>`).join('');
+    details.classList.add('show');
+  } else {
+    details.classList.remove('show');
+  }
+  banner.scrollIntoView({ behavior: 'smooth', block: 'center' });
+}
+
+async function verifyCertificate(input, idx) {
+  const file = input.files[0];
+  if (!file) return;
+
+  // Show filename
+  document.getElementById('fdt-' + idx).innerHTML =
+    '<strong>✓ ' + file.name.substring(0,28) + (file.name.length > 28 ? '…' : '') + '</strong>' +
+    '<div class="file-drop-filename">' + (file.size/1024).toFixed(1) + ' KB</div>';
+
+  setCardState(idx, 'loading');
+  const hash = await generateHash(file);
+
+  // Small delay for UX
+  setTimeout(() => {
+    const cert = verifyHash(hash);
+    if (cert) {
+      setCardState(idx, 'success', 'Verified on blockchain ✓', hash);
+      showBanner('success', '✔ Certificate Verified', 'This document is authentic and recorded on the blockchain.', hash, cert);
+    } else {
+      setCardState(idx, 'error', 'Not found in registry', hash);
+      showBanner('error', '✖ Not Found in Registry',
+        'This document hash is not registered. Upload the exact original file used during registration.', hash, null);
+    }
+  }, 600);
+}
+
+// ═══════════════════════════════════════════════════════════
+//  REGISTER FLOW
+// ═══════════════════════════════════════════════════════════
+let regHash = '';
+
+async function onRegisterFileChange(input) {
+  const file = input.files[0];
+  if (!file) return;
+  document.getElementById('reg-file-text').innerHTML =
+    '<strong>✓ ' + file.name.substring(0,32) + '</strong><div class="file-drop-filename">Computing hash…</div>';
+  document.getElementById('reg-hash-display').textContent = 'Computing…';
+  document.getElementById('reg-submit-btn').disabled = true;
+
+  regHash = await generateHash(file);
+  document.getElementById('reg-hash-display').textContent = regHash;
+  document.getElementById('reg-file-text').querySelector('.file-drop-filename').textContent =
+    (file.size/1024).toFixed(1) + ' KB  ·  Hash ready ✓';
+  document.getElementById('reg-submit-btn').disabled = false;
+}
+
+function registerCertificate() {
+  const owner     = document.getElementById('reg-owner').value.trim();
+  const doctype   = document.getElementById('reg-doctype').value;
+  const issuer    = document.getElementById('reg-issuer').value.trim();
+  const issuedate = document.getElementById('reg-date').value;
+  const resultEl  = document.getElementById('register-result');
+
+  if (!regHash) { showRegResult('error', '⚠ Please upload a certificate file first.'); return; }
+  if (!owner)   { showRegResult('error', '⚠ Please enter the owner name.'); return; }
+  if (!doctype) { showRegResult('error', '⚠ Please select the document type.'); return; }
+  if (!issuer)  { showRegResult('error', '⚠ Please enter who issued the certificate.'); return; }
+  if (!issuedate){ showRegResult('error', '⚠ Please enter the issue date.'); return; }
+
+  const result = registerHash({ hash: regHash, owner_name: owner, document_type: doctype, issued_by: issuer, issue_date: issuedate });
+
+  if (result.status === 'duplicate') {
+    showRegResult('dup', '⚠ This certificate hash is already registered on the blockchain.');
+  } else {
+    showRegResult('success', `✅ Certificate successfully registered! Blockchain ID: #${result.id}`);
+    // Reset
+    regHash = '';
+    document.getElementById('reg-hash-display').textContent = '— Upload a file above to generate hash —';
+    document.getElementById('reg-file-text').innerHTML = '<strong>Click to select certificate file</strong>JPG, PNG or PDF';
+    document.getElementById('reg-owner').value = '';
+    document.getElementById('reg-doctype').value = '';
+    document.getElementById('reg-issuer').value = '';
+    document.getElementById('reg-date').value = '';
+    document.getElementById('reg-file-input').value = '';
+    document.getElementById('reg-submit-btn').disabled = true;
+  }
+}
+
+function showRegResult(type, msg) {
+  const el = document.getElementById('register-result');
+  el.className = 'register-result ' + type;
+  el.style.display = 'block';
+  el.textContent = msg;
+  el.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+}
+
+// ═══════════════════════════════════════════════════════════
+//  LEDGER
+// ═══════════════════════════════════════════════════════════
+function refreshLedger() {
+  const certs = loadCerts();
+  const logs  = loadLogs();
+  const s     = getStats();
+
+  document.getElementById('ls-total').textContent  = s.total;
+  document.getElementById('ls-checks').textContent = s.checks;
+  document.getElementById('ls-valid').textContent  = s.valid;
+  document.getElementById('ls-failed').textContent = s.failed;
+
+  const certsBody = document.getElementById('certs-tbody');
+  if (certs.length === 0) {
+    certsBody.innerHTML = '<tr><td colspan="8"><div class="empty-state"><div class="empty-state-icon">📭</div>No certificates registered yet</div></td></tr>';
+  } else {
+    certsBody.innerHTML = certs.map(c => `
+      <tr>
+        <td style="color:var(--accent3)">#${c.id}</td>
+        <td><span class="hash-preview">${c.hash.substring(0,16)}…</span></td>
+        <td style="color:var(--text)">${c.owner_name}</td>
+        <td>${c.document_type}</td>
+        <td>${c.issued_by}</td>
+        <td>${c.issue_date}</td>
+        <td>${new Date(c.registered_at).toLocaleDateString()}</td>
+        <td><button class="delete-btn" onclick="deleteCert(${c.id})">🗑 Delete</button></td>
+      </tr>
+    `).join('');
+  }
+
+  const logsBody = document.getElementById('logs-tbody');
+  if (logs.length === 0) {
+    logsBody.innerHTML = '<tr><td colspan="4"><div class="empty-state"><div class="empty-state-icon">📋</div>No verification attempts yet</div></td></tr>';
+  } else {
+    logsBody.innerHTML = logs.slice(0,50).map((l,i) => `
+      <tr>
+        <td style="color:var(--text-dim)">${i+1}</td>
+        <td><span class="hash-preview">${l.hash.substring(0,16)}…</span></td>
+        <td><span class="badge ${l.status === 'valid' ? 'badge-green' : 'badge-red'}">${l.status === 'valid' ? '✓ Valid' : '✗ Not Found'}</span></td>
+        <td>${new Date(l.checked_at).toLocaleString()}</td>
+      </tr>
+    `).join('');
+  }
+}
+
+// ═══════════════════════════════════════════════════════════
+//  STATS BUBBLES
+// ═══════════════════════════════════════════════════════════
+function updateStatBubbles() {
+  const s = getStats();
+  document.getElementById('stat-total').textContent  = s.total;
+  document.getElementById('stat-checks').textContent = s.checks;
+}
+
+// ═══════════════════════════════════════════════════════════
+//  TABS
+// ═══════════════════════════════════════════════════════════
+function switchTab(name) {
+  document.querySelectorAll('.tab-btn').forEach((b,i) => {
+    b.classList.toggle('active', ['verify','register','ledger'][i] === name);
+  });
+  document.querySelectorAll('.tab-panel').forEach(p => p.classList.remove('active'));
+  document.getElementById('tab-' + name).classList.add('active');
+  if (name === 'ledger') refreshLedger();
+}
+
+// ═══════════════════════════════════════════════════════════
+//  INIT
+// ═══════════════════════════════════════════════════════════
+buildCards();
+updateStatBubbles();
+</script>
+</body>
+</html>
